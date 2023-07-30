@@ -3,8 +3,8 @@ version: '3.7'
 services:
 
   bot:
-    image: alyetama/discord-backup-bot:latest
-    #build: .
+    #image: alyetama/discord-backup-bot:latest
+    build: .
     restart: always
     command: python app/bot.py --use-all-services
     environment:
@@ -52,6 +52,7 @@ services:
 
   db:
     image: mysql
+    user: "1000"
     command: --default-authentication-plugin=mysql_native_password
     restart: always
     expose:
@@ -62,5 +63,11 @@ services:
       - MYSQL_USER=${DB_USERNAME:-polr}
       - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
-      - /var/lib/mysql
       - ./mysql-data:/var/lib/mysql
+# volumes:
+#   db:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: '/Volumes/GoogleDrive/My Drive/Discord-Bot/mysql-data'
+#       o: bind

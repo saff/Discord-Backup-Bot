@@ -6,6 +6,7 @@ RUN apt update && \
 	rm -rf /var/lib/apt/lists/*
 
 COPY bot.py requirements.txt app/
+RUN python3 -m pip install -U discord.py
 RUN pip install -r app/requirements.txt && \
 	rm -rf ~/.cache src
 
