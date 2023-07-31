@@ -34,7 +34,7 @@ class _UploadFile:
                                  compression=zipfile.ZIP_DEFLATED,
                                  compresslevel=9) as zf:
                 with tempfile.NamedTemporaryFile() as rf:
-                    rf.write(json.dumps(self.raw_data).encode('utf-8'))
+                    rf.write(json.dumps(self.raw_data, default=lambda o: '<not serializable>').encode('utf-8'))
                     rf.seek(0)
                     zf.write(rf.name, arcname=Path(self.object_name).stem)
             f.flush()
@@ -44,7 +44,7 @@ class _UploadFile:
 
     def upload_s3_object(self, object_data):
         client = Minio(os.getenv('S3_ENDPOINT'), os.getenv('S3_ACCESS_KEY'),
-                       os.getenv('S3_SECRET_KEY'))
+                       os.getenv('S3_SECRET_KEY'), secure=False)
         s3_object = client.put_object(os.getenv('S3_BUCKET_NAME'),
                                       self.object_name,
                                       object_data,
@@ -312,6 +312,8 @@ def main():
                   ]  # "call" is deprecated, "nonce" is almost always None
 
         public_attrs = []
+        public_attrs = ['attachments','author', 'channel', 'guild',
+                        'created_at', 'clean_content']
         history = []
 
         async for x in channel.history(limit=None):
@@ -509,7 +511,7 @@ def main():
                            value='Getting guild data...',
                            inline=False)
 
-        SERVER = {'channels': {}}
+        SERVER = {'channels': {'none': 'none whatsoever'}}
 
         guild_dict = get_guild(ctx.guild)
         SERVER.update({'guild': guild_dict})
@@ -522,12 +524,19 @@ def main():
         members_dicts = await get_members(ctx.guild.fetch_members())
         SERVER.update({'members': members_dicts})
 
+        logger.info(f'  these are the channels: {[c.id for c in ctx.guild.text_channels]}',
+                    server_id=ctx.author.id,
+                    user_id=ctx.guild.id)
+
         for channel in ctx.guild.text_channels:
             if channel_id:
                 if channel.id != channel_id:
                     continue
             start = time.time()
             try:
+                logger.info(f'Going to backup channel (id {channel.id})',
+                            server_id=ctx.author.id,
+                            user_id=ctx.guild.id)
                 channel_history = await backup_channel(channel)
             except discord.errors.Forbidden:
                 FINISHED_CHANNELS += 1
@@ -551,10 +560,11 @@ def main():
             success.append(channel.mention)
 
             SERVER['channels'].update({channel.id: channel_history})
+#            logger.info(f'this is raw data: {json.dumps(channel_history, default=lambda o: "<not serializable>")}', server_id=ctx.author.id, user_id=ctx.guild.id)
+
 
         ts = datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
         data_fname = f'{clean_guild_name}_data_{ts}.json.zip'
-
         uf = _UploadFile(SERVER, data_fname)
         data_obj = uf.get_compressed_file_object()
         if '--use-all-services' in sys.argv:
