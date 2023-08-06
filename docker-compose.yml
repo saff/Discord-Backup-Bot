@@ -2,6 +2,28 @@ version: '3.7'
 
 services:
 
+  nginx-proxy:
+    build: nginx
+    restart: always
+    volumes:
+      - ./nginx/default.conf:/tmp/default.conf
+    environment:
+      - FLASK_SERVER_ADDR=exporter:8000
+    ports:
+      - 8888:80
+    depends_on:
+      - exporter
+    command: /app/start.sh
+
+  exporter:
+    build: exporter
+    restart: always
+    ports:
+      - 8000:8000
+
+    command: gunicorn -w 3 -t 60 -b 0.0.0.0:8000 app:app
+
+
   bot:
     #image: alyetama/discord-backup-bot:latest
     build: .
